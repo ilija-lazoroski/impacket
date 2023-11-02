@@ -1002,7 +1002,7 @@ class DCOMConnection:
             DCOMConnection.OID_SET[target]['setid'] = 0
 
     @classmethod
-    def pingServer(cls):
+    def pingServer(cls, ping_timeout: int = 120):
         # Here we need to go through all the objects opened and ping them.
         # ToDo: locking for avoiding race conditions
         #print DCOMConnection.PORTMAPS
@@ -1038,17 +1038,17 @@ class DCOMConnection:
             LOG.error(str(e))
             pass
 
-        DCOMConnection.PINGTIMER = Timer(120,DCOMConnection.pingServer)
+        DCOMConnection.PINGTIMER = Timer(ping_timeout, DCOMConnection.pingServer, args=(ping_timeout,))
         try:
             DCOMConnection.PINGTIMER.start()
         except Exception as e:
             if str(e).find('threads can only be started once') < 0:
                 raise e
 
-    def initTimer(self):
+    def initTimer(self, ping_timeout: int):
         if self.__oxidResolver is True:
             if DCOMConnection.PINGTIMER is None:
-                DCOMConnection.PINGTIMER = Timer(120, DCOMConnection.pingServer)
+                DCOMConnection.PINGTIMER = Timer(ping_timeout, DCOMConnection.pingServer, args=(ping_timeout,))
             try:
                 DCOMConnection.PINGTIMER.start()
             except Exception as e:
@@ -1071,10 +1071,10 @@ class DCOMConnection:
         self.__portmap.connect()
         DCOMConnection.PORTMAPS[self.__target] = self.__portmap
 
-    def CoCreateInstanceEx(self, clsid, iid):
+    def CoCreateInstanceEx(self, clsid, iid, ping_timeout: int = 120):
         scm = IRemoteSCMActivator(self.__portmap)
         iInterface = scm.RemoteCreateInstance(clsid, iid)
-        self.initTimer()
+        self.initTimer(ping_timeout)
         return iInterface
 
     def get_dce_rpc(self):
