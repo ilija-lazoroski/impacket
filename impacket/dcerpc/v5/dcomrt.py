@@ -1071,9 +1071,9 @@ class DCOMConnection:
         self.__portmap.connect()
         DCOMConnection.PORTMAPS[self.__target] = self.__portmap
 
-    def CoCreateInstanceEx(self, clsid, iid):
+    def CoCreateInstanceEx(self, clsid, iid, connect_timeout: float = 300):
         scm = IRemoteSCMActivator(self.__portmap)
-        iInterface = scm.RemoteCreateInstance(clsid, iid)
+        iInterface = scm.RemoteCreateInstance(clsid, iid, connect_timeout)
         self.initTimer()
         return iInterface
 
@@ -1124,7 +1124,7 @@ class INTERFACE:
     CONNECTIONS = {}
 
     def __init__(self, cinstance=None, objRef=None, ipidRemUnknown=None, iPid=None, oxid=None, oid=None, target=None,
-                 interfaceInstance=None):
+                 interfaceInstance=None, transport_connect_timeout:float = 300):
         if interfaceInstance is not None:
             self.__target = interfaceInstance.get_target()
             self.__iPid = interfaceInstance.get_iPid()
@@ -1150,6 +1150,8 @@ class INTERFACE:
 
             if objRef is not None:
                 self.process_interface(objRef)
+
+        self.__transport_connect_timeout = transport_connect_timeout
 
     def process_interface(self, data):
         objRefType = OBJREF(data)['flags']
@@ -1213,6 +1215,9 @@ class INTERFACE:
 
     def set_cinstance(self, cinstance):
         self.__cinstance = cinstance
+
+    def set_transport_connect_timeout(self, transport_connect_timeout):
+        self.__transport_connect_timeout = transport_connect_timeout
 
     def is_fqdn(self):
         # I will assume the following
@@ -1291,7 +1296,7 @@ class INTERFACE:
                     dcomInterface.set_credentials(*DCOMConnection.PORTMAPS[self.__target].get_credentials())
                     dcomInterface.set_kerberos(DCOMConnection.PORTMAPS[self.__target].get_rpc_transport().get_kerberos(),
                                                DCOMConnection.PORTMAPS[self.__target].get_rpc_transport().get_kdcHost())
-                dcomInterface.set_connect_timeout(300)
+                dcomInterface.set_connect_timeout(self.__transport_connect_timeout)
                 dce = dcomInterface.get_dce_rpc()
 
                 if iid is None:
@@ -1752,7 +1757,7 @@ class IRemoteSCMActivator:
         return IRemUnknown2(INTERFACE(classInstance, b''.join(propsOut['ppIntfData'][0]['abData']), ipidRemUnknown,
                                       target=self.__portmap.get_rpc_transport().getRemoteHost()))
 
-    def RemoteCreateInstance(self, clsId, iid):
+    def RemoteCreateInstance(self, clsId, iid, connect_timeout: float = 300):
         # Only supports one interface at a time
         self.__portmap.bind(IID_IRemoteSCMActivator)
 
@@ -1914,4 +1919,5 @@ class IRemoteSCMActivator:
         classInstance.set_auth_level(scmr['remoteReply']['authnHint'])
         classInstance.set_auth_type(self.__portmap.get_auth_type())
         return IRemUnknown2(INTERFACE(classInstance, b''.join(propsOut['ppIntfData'][0]['abData']), ipidRemUnknown,
-                                      target=self.__portmap.get_rpc_transport().getRemoteHost()))
+                                      target=self.__portmap.get_rpc_transport().getRemoteHost(),
+                                      transport_connect_timeout= connect_timeout))
